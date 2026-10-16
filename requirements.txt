@@ -1,0 +1,12 @@
+flask
+gunicorn
+gTTS
+Pillow
+optimum[openvino]
+openvino
+transformers
+deep-translator
+pyopenssl
+rapidocr-onnxruntime==1.4.4
+numpy
+edge-tts

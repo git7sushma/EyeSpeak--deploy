@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EyeSpeak</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: #FAF7F2;
+            color: #1A1A1A;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .logo {
+            width: 140px;
+            max-width: 40vw;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 52px;
+            margin-bottom: 5px;
+            color: #0F2C59;
+            letter-spacing: 2px;
+        }
+
+        p.subtitle {
+            font-size: 20px;
+            color: #1A1A1A;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        select {
+            font-size: 22px;
+            padding: 12px 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            background: #fff;
+            color: #1A1A1A;
+            border: 2px solid #0F2C59;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        video {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 20px;
+            border: 3px solid #0F2C59;
+            margin-bottom: 25px;
+        }
+
+        button {
+            font-size: 30px;
+            padding: 22px 50px;
+            border-radius: 20px;
+            border: none;
+            background-color: #0F2C59;
+            color: #fff;
+            cursor: pointer;
+            margin-bottom: 25px;
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+        }
+
+        .search-icon {
+            width: 30px;
+            height: 30px;
+            flex-shrink: 0;
+        }
+
+        button:active { background-color: #0A1D3D; }
+
+        #result {
+            font-size: 26px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px;
+            color: #1A1A1A;
+            min-height: 60px;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        #status {
+            font-size: 16px;
+            color: #A91D22;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <img src="/static/logo.png" alt="EyeSpeak logo" class="logo">
+    <h1>EyeSpeak</h1>
+    <p class="subtitle">Your AI vision assistant, point your camera at anything</p>
+
+    <select id="language">
+        <option value="en">English</option>
+        <option value="ar">Arabic</option>
+        <option value="ur">Urdu</option>
+        <option value="hi">Hindi</option>
+        <option value="tr">Turkish</option>
+        <option value="ko">Korean</option>
+        <option value="ja">Japanese</option>
+        <option value="zh-CN">Chinese</option>
+        <option value="tl">Tagalog</option>
+        <option value="te">Telugu</option>
+        <option value="bn">Bengali</option>
+        <option value="ml">Malayalam</option>
+        <option value="ta">Tamil</option>
+        <option value="gu">Gujarati</option>
+        <option value="fr">French</option>
+        <option value="es">Spanish</option>
+        <option value="de">German</option>
+        <option value="it">Italian</option>
+        <option value="pt">Portuguese</option>
+        <option value="ru">Russian</option>
+        <option value="nl">Dutch</option>
+    </select>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+
+    <button onclick="identify()">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10.5" cy="10.5" r="6.5"></circle>
+            <line x1="20" y1="20" x2="15.5" y2="15.5"></line>
+        </svg>
+        Identify
+    </button>
+
+    <div id="result">Ready? point your camera and press Identify</div>
+    <div id="status"></div>
+
+    <audio id="audio"></audio>
+
+    <script>
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(stream => {
+                document.getElementById('video').srcObject = stream;
+            })
+            .catch(err => {
+                document.getElementById('status').innerText = 'Camera error: ' + err.message;
+            });
+
+        function identify() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const language = document.getElementById('language').value;
+
+            document.getElementById('result').innerText = 'Hold steady...';
+            document.getElementById('status').innerText = '';
+
+            // Brief pause before capturing so the camera can settle/focus -
+            // capturing the instant the button is tapped often catches
+            // motion blur from the hand still moving into position.
+            setTimeout(() => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const imageData = canvas.toDataURL('image/jpeg');
+
+                document.getElementById('result').innerText = 'Looking...';
+
+                fetch('/identify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData, language: language })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('result').innerText = data.description;
+                    const audio = document.getElementById('audio');
+                    audio.src = data.audio + '?t=' + new Date().getTime();
+                    audio.play();
+                })
+                .catch(err => {
+                    document.getElementById('result').innerText = 'Something went wrong, please try again';
+                    document.getElementById('status').innerText = err.message;
+                });
+            }, 600);
+        }
+    </script>
+
+</body>
+</html>
+
